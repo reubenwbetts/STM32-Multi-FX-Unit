@@ -1,0 +1,16 @@
+../Core/Src/BasicTremolo.cpp:12:1:TREMBlock::TREMBlock()	16	static
+../Core/Src/BasicTremolo.cpp:19:6:void TREMBlock::process(float)	24	static
+../Core/Src/BasicTremolo.cpp:127:7:float TREMBlock::saw_lfo_out()	16	static
+../Core/Src/BasicTremolo.cpp:131:7:float TREMBlock::saw_lfo_shift_out()	16	static
+../Core/Src/BasicTremolo.cpp:135:7:float TREMBlock::saw_lfo_shift2_out()	16	static
+../Core/Src/BasicTremolo.cpp:139:7:float TREMBlock::tri_lfo_out()	16	static
+../Core/Src/BasicTremolo.cpp:143:7:float TREMBlock::tri_lfo_shift_out()	16	static
+../Core/Src/BasicTremolo.cpp:147:7:float TREMBlock::tri_lfo_shift2_out()	16	static
+../Core/Src/BasicTremolo.cpp:151:7:float TREMBlock::square_lfo_out()	16	static
+../Core/Src/BasicTremolo.cpp:155:7:float TREMBlock::square_lfo_shift_out()	16	static
+../Core/Src/BasicTremolo.cpp:159:7:float TREMBlock::square_lfo_shift2_out()	16	static
+../Core/Src/BasicTremolo.cpp:163:7:float TREMBlock::sine_lfo_out()	16	static
+../Core/Src/BasicTremolo.cpp:167:7:float TREMBlock::sine_lfo_shift_out()	16	static
+../Core/Src/BasicTremolo.cpp:171:7:float TREMBlock::sine_lfo_shift2_out()	16	static
+../Core/Src/BasicTremolo.cpp:175:6:void TREMBlock::setRate(float)	16	static
+../Core/Src/BasicTremolo.cpp:179:6:void TREMBlock::setDepth(float)	16	static

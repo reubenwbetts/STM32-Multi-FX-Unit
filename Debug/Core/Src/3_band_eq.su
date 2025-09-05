@@ -1,0 +1,5 @@
+../Core/Src/3_band_eq.cpp:13:6:void basic_eq::set_low_shelf_gain(float)	16	static
+../Core/Src/3_band_eq.cpp:18:6:void basic_eq::set_low_mid_bell_gain(float)	16	static
+../Core/Src/3_band_eq.cpp:23:6:void basic_eq::set_high_mid_bell_gain(float)	16	static
+../Core/Src/3_band_eq.cpp:28:6:void basic_eq::set_high_shelf_gain(float)	16	static
+../Core/Src/3_band_eq.cpp:37:7:float basic_eq::process(float)	32	static

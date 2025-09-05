@@ -1,0 +1,562 @@
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * File Name          : freertos.c
+  * Description        : Code for freertos applications
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2023 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+
+/* Includes ------------------------------------------------------------------*/
+#include "FreeRTOS.h"
+#include "task.h"
+#include "main.h"
+#include "cmsis_os.h"
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+uint8_t page_idx = 0;
+uint8_t current_page = 10;
+#include "AudioProcess.hpp" //include the CPP hook
+#include <math.h>
+#include <stdio.h>
+
+
+/* USER CODE END Includes */
+
+/* Private typedef -----------------------------------------------------------*/
+/* USER CODE BEGIN PTD */
+
+/* USER CODE END PTD */
+
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+
+/* USER CODE END PD */
+
+/* Private macro -------------------------------------------------------------*/
+/* USER CODE BEGIN PM */
+
+/* USER CODE END PM */
+
+/* Private variables ---------------------------------------------------------*/
+/* USER CODE BEGIN Variables */
+
+
+
+
+/* USER CODE END Variables */
+osThreadId audioTaskHandle;
+osThreadId auxTaskHandle;
+osThreadId myFlashAliveTasHandle;
+osMessageQId audioQueueHandle;
+
+/* Private function prototypes -----------------------------------------------*/
+/* USER CODE BEGIN FunctionPrototypes */
+void BufferHandling(void); //Called by audio thread to deal with messages and then call copy buffer etc.
+void CopyBuffer(int16_t *pbuffer1, int16_t *pbuffer2, uint16_t BlockSize);
+/* USER CODE END FunctionPrototypes */
+
+void StartAudioTask(void const * argument);
+void auxTaskStart(void const * argument);
+void StartFlashAliveTask(void const * argument);
+
+void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
+
+/* GetIdleTaskMemory prototype (linked to static allocation support) */
+void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize );
+
+/* USER CODE BEGIN GET_IDLE_TASK_MEMORY */
+static StaticTask_t xIdleTaskTCBBuffer;
+static StackType_t xIdleStack[configMINIMAL_STACK_SIZE];
+
+void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize )
+{
+  *ppxIdleTaskTCBBuffer = &xIdleTaskTCBBuffer;
+  *ppxIdleTaskStackBuffer = &xIdleStack[0];
+  *pulIdleTaskStackSize = configMINIMAL_STACK_SIZE;
+  /* place for user code */
+}
+/* USER CODE END GET_IDLE_TASK_MEMORY */
+
+/**
+  * @brief  FreeRTOS initialization
+  * @param  None
+  * @retval None
+  */
+void MX_FREERTOS_Init(void) {
+  /* USER CODE BEGIN Init */
+
+  /* USER CODE END Init */
+
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* Create the queue(s) */
+  /* definition and creation of audioQueue */
+  osMessageQDef(audioQueue, 16, uint8_t);
+  audioQueueHandle = osMessageCreate(osMessageQ(audioQueue), NULL);
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+  /* definition and creation of audioTask */
+  osThreadDef(audioTask, StartAudioTask, osPriorityHigh, 0, 1024);
+  audioTaskHandle = osThreadCreate(osThread(audioTask), NULL);
+
+  /* definition and creation of auxTask */
+  osThreadDef(auxTask, auxTaskStart, osPriorityIdle, 0, 512);
+  auxTaskHandle = osThreadCreate(osThread(auxTask), NULL);
+
+  /* definition and creation of myFlashAliveTas */
+  osThreadDef(myFlashAliveTas, StartFlashAliveTask, osPriorityIdle, 0, 512);
+  myFlashAliveTasHandle = osThreadCreate(osThread(myFlashAliveTas), NULL);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  /* USER CODE END RTOS_THREADS */
+
+}
+
+/* USER CODE BEGIN Header_StartAudioTask */
+/**
+  * @brief  Function implementing the audioTask thread.
+  * @param  argument: Not used
+  * @retval None
+  */
+/* USER CODE END Header_StartAudioTask */
+void StartAudioTask(void const * argument)
+{
+  /* USER CODE BEGIN StartAudioTask */
+
+  /* Infinite loop */
+  for(;;)
+  {
+	BufferHandling();
+    osDelay(1);
+  }
+  /* USER CODE END StartAudioTask */
+}
+
+/* USER CODE BEGIN Header_auxTaskStart */
+/**
+* @brief Function implementing the auxTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_auxTaskStart */
+void auxTaskStart(void const * argument)
+{
+  /* USER CODE BEGIN auxTaskStart */
+
+
+  /* Infinite loop */
+  for(;;)
+  {
+	  int PinStatusD2 = HAL_GPIO_ReadPin(GPIOC, ARD_D5_Pin);
+	  int PinStatusD8 = HAL_GPIO_ReadPin(GPIOJ, ARD_D4_Pin);
+	  int PinStatusD7 = HAL_GPIO_ReadPin(GPIOJ, ARD_D7_Pin);
+
+	  if (PinStatusD2 == 1){
+		  page_idx = 0;
+		  printf("idx=0!");
+	  }
+	  else if (PinStatusD7 == 1){
+		  page_idx = 4;
+		  printf("idx=4!");
+	  }
+	  else if (PinStatusD8 == 1){
+		  page_idx = 8;
+		  printf("idx=8!");
+	  }
+	  else {page_idx = current_page;}
+	  printf("Page IDX = %u", page_idx);
+
+
+	  if(page_idx != current_page){
+		  switch (page_idx){
+		  case 8:
+			  BSP_LCD_SelectLayer(0);
+
+			  //BSP_LCD_DrawFillRect(0,0, 800, 480);
+
+			  BSP_LCD_SelectLayer(1); //Makes 1 the active layer
+			  BSP_LCD_Clear(LCD_COLOR_TRANSPARENT); //So we can see the Layer 0 underneath ..important otherwise layer is overlaid with keying.
+
+			  BSP_LCD_SetBackColor(LCD_COLOR_BLACK);
+
+			  //BSP_LCD_DrawBitmap(0, 0, webb_first_f769idisco);
+
+
+
+			  BSP_LCD_SetBackColor(LCD_COLOR_BLACK); //ditto
+			  BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+			  BSP_LCD_SetFont(&Font24);
+			  BSP_LCD_DisplayStringAt(0,LINE(2) , (uint8_t *)"Tremolo", CENTER_MODE);
+
+			  // Draw sliders and text
+
+			  BSP_LCD_DisplayStringAt(280, 100 , (uint8_t *)"Pan", LEFT_MODE);
+			  BSP_LCD_DrawRect(300, 140, 20,240);
+			  BSP_LCD_DisplayStringAt(470, 100 , (uint8_t *)"Depth", LEFT_MODE);
+			  BSP_LCD_DrawRect(500, 140, 20,240);
+			  BSP_LCD_DisplayStringAt(670, 100 , (uint8_t *)"Freq", LEFT_MODE);
+			  BSP_LCD_DrawRect(700, 140, 20,240);
+
+			  // Draw buttons + Text
+			  BSP_LCD_DisplayStringAt(50,100 , (uint8_t *)"LFO Shape", LEFT_MODE);
+			  BSP_LCD_FillCircle(100, 175, 20);
+			  BSP_LCD_DisplayStringAt(140,162 , (uint8_t *)"Tri", LEFT_MODE);
+			  BSP_LCD_FillCircle(100, 250, 20);
+			  BSP_LCD_DisplayStringAt(140,238 , (uint8_t *)"Saw", LEFT_MODE);
+			  BSP_LCD_FillCircle(100, 325, 20);
+			  BSP_LCD_DisplayStringAt(140,312 , (uint8_t *)"Sqr", LEFT_MODE);
+			  BSP_LCD_FillCircle(100, 400, 20);
+			  BSP_LCD_DisplayStringAt(140,387 , (uint8_t *)"Sin", LEFT_MODE);
+
+			  //
+			  // Update page_idx so it doesn't constantly redraw the UI
+
+			  current_page = page_idx;
+			  break;
+
+		  case 4:
+		  			  BSP_LCD_SelectLayer(0);
+
+		  			  //BSP_LCD_DrawFillRect(0,0, 800, 480);
+
+		  			  BSP_LCD_SelectLayer(1); //Makes 1 the active layer
+		  			  BSP_LCD_Clear(LCD_COLOR_TRANSPARENT); //So we can see the Layer 0 underneath ..important otherwise layer is overlaid with keying.
+
+		  			  BSP_LCD_SetBackColor(LCD_COLOR_BLACK);
+
+		  			  BSP_LCD_SetBackColor(LCD_COLOR_BLACK); //ditto
+		  			  BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+		  			  BSP_LCD_SetFont(&Font24);
+		  			  BSP_LCD_DisplayStringAt(0,LINE(2) , (uint8_t *)"EQ", CENTER_MODE);
+
+		  			  // Draw sliders and text
+		  			  BSP_LCD_DisplayStringAt(80, 100 , (uint8_t *)"LF", LEFT_MODE);
+		  			  BSP_LCD_DrawRect(100, 140, 20,240);
+		  			  BSP_LCD_DisplayStringAt(280, 100 , (uint8_t *)"LMF", LEFT_MODE);
+		  			  BSP_LCD_DrawRect(300, 140, 20,240);
+		  			  BSP_LCD_DisplayStringAt(470, 100 , (uint8_t *)"HMF", LEFT_MODE);
+		 			  BSP_LCD_DrawRect(500, 140, 20,240);
+		 			  BSP_LCD_DisplayStringAt(670, 100 , (uint8_t *)"HF", LEFT_MODE);
+		 			  BSP_LCD_DrawRect(700, 140, 20,240);
+
+
+		  			  //
+		  			  // Update page_idx so it doesn't constantly redraw the UI
+
+		  			  current_page = page_idx;
+		  			  break;
+
+		  case 0:
+		  			  BSP_LCD_SelectLayer(0);
+
+		  			  //BSP_LCD_DrawFillRect(0,0, 800, 480);
+
+		  			  BSP_LCD_SelectLayer(1); //Makes 1 the active layer
+		  			  BSP_LCD_Clear(LCD_COLOR_TRANSPARENT); //So we can see the Layer 0 underneath ..important otherwise layer is overlaid with keying.
+
+		  			  BSP_LCD_SetBackColor(LCD_COLOR_BLACK);
+
+		  			  //BSP_LCD_DrawBitmap(0, 0, webb_first_f769idisco);
+
+
+
+		  			  BSP_LCD_SetBackColor(LCD_COLOR_BLACK); //ditto
+		  			  BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+		  			  BSP_LCD_SetFont(&Font24);
+		  			  BSP_LCD_DisplayStringAt(0,LINE(2) , (uint8_t *)"REVERB", CENTER_MODE);
+
+		  			  // Draw sliders
+
+		  			  BSP_LCD_DisplayStringAt(80, 100 , (uint8_t *)"Pre-Delay", LEFT_MODE);
+		  			  BSP_LCD_DrawRect(100, 140, 20,240);
+		  			  BSP_LCD_DisplayStringAt(280, 100 , (uint8_t *)"Wet/Dry", LEFT_MODE);
+		  			  BSP_LCD_DrawRect(300, 140, 20,240);
+		  			  BSP_LCD_DisplayStringAt(470, 100 , (uint8_t *)"Damping", LEFT_MODE);
+		 			  BSP_LCD_DrawRect(500, 140, 20,240);
+		 			  BSP_LCD_DisplayStringAt(670, 100 , (uint8_t *)"Decay", LEFT_MODE);
+		 			  BSP_LCD_DrawRect(700, 140, 20,240);
+
+		  			  // Update page_idx so it doesn't constantly redraw the UI
+
+		  			  current_page = page_idx;
+		  			  break;
+
+
+		  		  }
+
+
+	  }
+
+	  //HAL_GPIO_TogglePin(GPIOJ, ARD_D4_Pin); //Signify the task is running
+      //We can read things and based on wha we read, change Globals
+
+	  ts_status = BSP_TS_GetState(&TS_State);
+      if(TS_State.touchDetected){
+
+		  //Due to the capacitive nature, sometimes spurious touches
+		  //are detected..so watch this with traps.
+
+		  /* Get X and Y position of the first touch post calibrated */
+		  uint16_t x1 = TS_State.touchX[0];
+		  uint16_t y1 = TS_State.touchY[0];
+
+
+		  //Need to check these values in case of spurious values
+		  //limit with a mod instruction for example
+		  uint16_t user_x = x1 % 800;
+		  uint16_t user_y = y1 % 480;
+		  coeffOne = (float)(480-user_y)*coeffOne_inc;
+		  coeffTwo = (float)((800-user_x)*coeffTwo_inc);
+
+		  //For the Tremolo, interesting effects, 1000 and 2 for below. :)
+		  // gain for now.....
+
+		 // coeffTwo = (0.001 * pow(1.0 / 0.001, coeffTwo))*10000.0+5000.0;
+		  printf("coeffTwo = %.2f", coeffTwo);
+		  printf("\n");
+		  printf("coeffOne = %.2f", coeffOne);
+		  printf("\n");
+
+		  if (coeffTwo > 0.0 && coeffTwo <= 0.25){
+			  UpdateObjects(1+page_idx,user_x,user_y);
+			  }
+			  if (coeffTwo > 0.25 && coeffTwo <= 0.5 ){
+				  UpdateObjects(2+page_idx,user_x,user_y);
+			  }
+			  if (coeffTwo > 0.5 && coeffTwo <= 0.75 ){
+				  UpdateObjects(3+page_idx,user_x,user_y);
+			  }
+
+			  if (coeffTwo > 0.75 && coeffTwo < 1.0 ){
+				  UpdateObjects(4+page_idx,user_x,user_y);
+			  }
+
+		  }
+
+      }
+
+      // BSP_LCD_FillRect(100, 200, 10, 100);
+
+      osDelay(10); //this will slow the scan time of the TS
+
+
+
+  /* USER CODE END auxTaskStart */
+}
+
+/* USER CODE BEGIN Header_StartFlashAliveTask */
+/**
+* @brief Function implementing the myFlashAliveTas thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartFlashAliveTask */
+void StartFlashAliveTask(void const * argument)
+{
+  /* USER CODE BEGIN StartFlashAliveTask */
+  /* Infinite loop */
+
+
+
+
+	for(;;)
+	{
+		BSP_LED_Toggle(LED_RED);//Flash on main board
+		//printf("%d\r\n", CurrentLsample);
+
+		//int16_t scaledSample = (abs(CurrentLsample)/10); //gives potentially 100 length
+		//printf("%d\r\n", scaledSample);
+
+
+		//BSP_LCD_FillRect(350, 200, 100, 100);
+
+		//Basic Audio Monitor..
+
+		//flash all the other leds..
+
+
+		osDelay(10);
+  }
+  /* USER CODE END StartFlashAliveTask */
+}
+
+/* Private application code --------------------------------------------------*/
+/* USER CODE BEGIN Application */
+
+
+/*Handle Buffers..
+   * Will get called at half and full buffer point so..can copy the contents into
+   * L & R buffer then process so long as the copy is quick enough..
+   *
+   */
+ void CopyBuffer(int16_t *pbuffer1, int16_t *pbuffer2, uint16_t BlockSize)
+  {
+
+ 	 /*
+ 	  * pbuffer2 is the source
+		 	pbuffer1 is the dest
+		 	So, always process the source to the destination :)
+ 	  * The DMA transfers in BYTES and is configured in BYTES so
+ 	  * it's important when considering indexing and buffer sizes
+ 	  * An SAI frame is made up of 8  bytes
+ 	  * Int16  Int16 Int16  Iint16
+ 	  * This allows transferral of varying sizes of data
+ 	  * In our case
+ 	  * L - 1st Int16
+ 	  * -
+ 	  * R   3rd Int16
+ 	  * -
+ 	  * Our Sample Size is 2 Bytes - Int16
+ 	  *
+ 	  *  pbuffer2 is the source
+		 pbuffer1 is the dest
+ 	 	 So..at the point this function is called,  the 'other half' of the buffer is being filled and output
+ 	 	 therefore we can copy the DMA buffer into a processing buffer (as the DMA is 8  bytes)
+ 	 	 and then process before copying back
+ 	 	 So, 2 functions are required, 1 to extract the samples, the  other to return them to the buffer
+ 	  *
+ 	  *
+ 	  *
+ 	  *
+ 	  */
+
+     //Lets clear the entire destination playback DMA buffer here..
+ 	 //We're just clearing  because if we operate only on the left or right
+ 	 //the  data from  the last block will still be there..
+	 //If we're operating on both, this can be removed
+
+ 	 for (uint32_t i = 0; i < BlockSize; i++)
+ 	 {
+ 		 pbuffer1[i] = 0; //needs  to  be careful as these are still int16_t buffers when we do maths
+ 	 }
+
+     //Call AudioProcess CPP Access ...
+
+ 	 /*Try copy into larger circ buffer here...
+ 	 * Then AudioProcess would be passed the current read pointer (start of where the input block is in the
+ 	 * circular buffer, block size, and the
+ 	 * current output pointer to Playback Buffer, the latter
+ 	 * being a flip flop between Playback[0] and Playback[size/2]
+ 	 */
+
+ 	 AudioProcess(pbuffer1, pbuffer2, BlockSize, page_idx);
+ 	 //This allows audio objects to be C callable defined through AudioProcess.hpp/cpp
+
+
+
+
+
+
+} //Copy Buffer function
+
+
+
+void BufferHandling(void){
+
+     /* 1st or 2nd half of the record buffer ready for being copied to the Playback buffer */
+
+	osEvent retvalue  = osMessageGet( audioQueueHandle, 1000 );
+	uint16_t buffer_state = retvalue.value.v;
+
+    switch(buffer_state){
+    	case BUFFER_OFFSET_HALF:{
+    		//HAL_GPIO_WritePin(GPIOJ, ARD_D7_Pin, GPIO_PIN_SET); //Indicate rate of half filling buffer
+    		//Ready to copy first block of audio samples to output buffer
+        	CopyBuffer(&PlaybackBuffer[0],
+        	&RecordBuffer[0],
+        	RECORD_BUFFER_SIZE / 2);
+        	audio_rec_buffer_state = BUFFER_OFFSET_NONE;  //Reset
+        	//HAL_GPIO_TogglePin(GPIOC, ARD_D5_Pin);
+        	//HAL_GPIO_WritePin(GPIOJ, ARD_D7_Pin, GPIO_PIN_RESET); //Indicate rate of half filling buffer
+        	break;
+        	}
+    	case BUFFER_OFFSET_FULL:{
+    		//Ready to copy next block of audio samples to output buffer
+    		 CopyBuffer(&PlaybackBuffer[RECORD_BUFFER_SIZE / 2],
+        	 &RecordBuffer[RECORD_BUFFER_SIZE / 2],
+        	 RECORD_BUFFER_SIZE / 2);
+        	 audio_rec_buffer_state = BUFFER_OFFSET_NONE; //Reset
+        	 //HAL_GPIO_TogglePin(GPIOC, ARD_D5_Pin);
+        	 break;
+        	}
+        case BUFFER_OFFSET_NONE:{
+        	 //Allow subtask like  scan of TS proc
+        	 break;
+        	 }
+        default : {
+        	//printf("Error on audio_rec_buffer_state switch\r\n");
+        	Error_Handler();
+        	break;
+        	}
+    	} //End of switch
+} // end AUDIO_PROCESS function
+
+
+
+
+//These are the important call back functions, declared as weak in the discovery_audio.h/.c
+    //So we can override them as needed
+    //As they're in main, we will need to make sure they then can see and can send to the FreeRTOS listener
+    //thread
+    void BSP_AUDIO_OUT_HalfTransfer_CallBack(void)
+    {
+        //audio_tx_buffer_state = 1;
+        //Everything is driven by the receive but we need to have
+        //this callback
+    }
+
+
+    /**
+      * @brief Manages the DMA Transfer complete interrupt.
+      * @param None
+      * @retval None
+      */
+    void BSP_AUDIO_IN_TransferComplete_CallBack(void)
+    {
+       audio_rec_buffer_state = BUFFER_OFFSET_FULL;
+       osMessagePut(audioQueueHandle, audio_rec_buffer_state, 1000); //Send 1
+    }
+
+
+    /**
+      * @brief  Manages the DMA Half Transfer complete interrupt.
+      * @param  None
+      * @retval None
+      */
+    void BSP_AUDIO_IN_HalfTransfer_CallBack(void)
+    {
+        audio_rec_buffer_state = BUFFER_OFFSET_HALF;
+        osMessagePut(audioQueueHandle, audio_rec_buffer_state, 1000); //Send 1
+    }
+
+
+
+/* USER CODE END Application */
+

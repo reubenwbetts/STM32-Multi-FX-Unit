@@ -1,0 +1,57 @@
+/*
+ * 3_band_eq.cpp
+ *
+ *  Created on: Apr 22, 2025
+ *      Author: admin
+ */
+
+#ifndef SRC_3_BAND_EQ_CPP_
+#define SRC_3_BAND_EQ_CPP_
+#include "3_band_eq.hpp"
+#include <cmath>
+
+void basic_eq::set_low_shelf_gain(float gain)
+{
+	g_ls = gain * 2.0 - 1.0;
+}
+
+void basic_eq::set_low_mid_bell_gain(float gain)
+{
+	g_lmb = gain * 2.0 - 1.0;
+}
+
+void basic_eq::set_high_mid_bell_gain(float gain)
+{
+	g_hmb = gain * 2.0 - 1.0;;
+}
+
+void basic_eq::set_high_shelf_gain(float gain_hs)
+{
+	g_hs = gain_hs * 2.0 - 1.0;
+
+}
+
+// stacked filters as trying to get single ones to behave in the gain range I wanted was
+// proving difficult - not 100% sure why
+
+float basic_eq::process(float input)
+	{
+		float audio_out = filter_ls.process_lpf(input * g_ls) + input;
+		audio_out = filter_ls2.process_lpf(input * g_ls) + input;
+
+		audio_out = filter_lmb.process_bpf(audio_out * g_lmb) + audio_out;
+		audio_out = filter_lmb.process_lpf(filter_lmb.process_hpf(audio_out* g_lmb)) + audio_out;
+
+		audio_out = filter_hmb.process_bpf(audio_out * g_hmb) + audio_out;
+		audio_out = filter_hmb.process_lpf(filter_hmb.process_hpf(audio_out* g_hmb)) + audio_out;
+
+		audio_out = filter_hs.process_hpf(audio_out * g_hs) + audio_out;
+		audio_out = filter_hs2.process_hpf(audio_out * g_hs * 0.5) + audio_out;
+		audio_out = tanh(audio_out);
+		return audio_out;
+	}
+
+
+
+
+#endif /* SRC_3_BAND_EQ_CPP_ */
