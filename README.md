@@ -22,6 +22,7 @@ Controls for the Reverb are as follows:
 
 **EQ**
 
+Controls for the EQ are as follows:
 - LF (low shelf gain)
 - LMF (low mid bell gain)
 - HMF (high mid bell gain)
