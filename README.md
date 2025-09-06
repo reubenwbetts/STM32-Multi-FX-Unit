@@ -1,25 +1,29 @@
-# STM_Lab18_AudioSystemDemo
- Demo of Basic Audio System on STM32F769I DISCO
+# MULTI-FX-UNIT
 
-This is a project for the STM32f769i-Disco development board.
+This is a project for the STM32f769i-Disco development board completed for my Digital Audio Systems and Processing Module. The code is messy, and contains alot of junk, but I've decided to share it as it a fully functioning system that still sounds very cool, especially the Tremolo and Reverb. A much better developed and greatly improved version of the Reverb alogirithim (and better example of my programming skills!) can be found in this repo: https://github.com/reubenwbetts/BYC-VERB-JUCE
 
-Cube IDE v1.31.1
+It tuns a Reverb, EQ and Tremolo, with the FX selectable with the GPIO buttons. Each FX's parameters is controlled via the LCD/Touchscreen, with the parameter list (and it's effects) shown below.
 
-It runs up the audio CODEC, sets up the LCD and touch screen and also uses some basic GPIO checks for buttons.
+**Tremolo**
 
-Compiler pre-processor settings are -
+Controls for the Tremolo are as follows:
+- LFO Shape (selectable waveforms: sine, triangle, square and saw)
+- Pan (phase shifts the left and right channels waveforms to create an Autopan effect)
+- Depth (intensity of the effect)
+- Freq (speed of effect)
 
-DEBUG
+**Reverb**
 
-USE_STM32F769I_DISCO_REVB03
+Controls for the Reverb are as follows:
+- Blend (simple wet/dry mix)
+- Decay (length of the Reverb tail)
+- Damping (reduces high-frequency decay)
+- Pre-Delay (delays the wet signal by a certain amount)
 
-USE_HAL_DRIVER
+**EQ**
 
-STM32F769xx
-
-The Demo performs a CPP implementation of a Tremolo effect. More effects can easily be added by using the the Tremolo Class Example.
-
-Walkthrough video is here:
-
-https://youtu.be/E3a-ASKDnXk
-
+- LF (low shelf gain)
+- LMF (low mid bell gain)
+- HMF (high mid bell gain)
+- HF (high shelf gain)
+  
